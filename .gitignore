@@ -1,41 +1,157 @@
-# Prerequisites
-*.d
+## ======================
+## ASP.NET Core / .NET
+## ======================
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# Build outputs
+bin/
+obj/
+out/
 
-# Precompiled Headers
-*.gch
-*.pch
+# NuGet packages
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!**/packages/build/
 
-# Linker files
-*.ilk
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
 
-# Debugger Files
-*.pdb
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+# Rider
+.idea/
+*.sln.iml
 
-# Fortran module files
-*.mod
-*.smod
+# ======================
+## Entity Framework Core
+## ======================
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+# SQLite dev database
+*.db
+*.db-shm
+*.db-wal
+idlequest.db
 
-# Executables
-*.exe
-*.out
-*.app
+# Migration snapshots (keep migrations, ignore runtime artifacts)
+# Uncomment below if you want to exclude migrations too
+# Migrations/
 
-# debug information files
-*.dwo
+# ======================
+## ASP.NET Core Identity / Auth
+## ======================
+
+# Data Protection keys
+DataProtection-Keys/
+
+# ======================
+## Environment & Secrets
+## ======================
+
+# Never commit secrets!
+appsettings.Development.json
+appsettings.Production.json
+secrets.json
+.env
+.env.*
+*.pfx
+*.p12
+*.key
+*.pem
+
+# User secrets
+**/Properties/launchSettings.json
+
+# ======================
+## Publish / Deploy
+## ======================
+
+publish/
+**/publish/
+*.pubxml
+*.pubxml.user
+*.azurePubxml
+**/Properties/PublishProfiles/
+
+# ======================
+## Logs & Runtime
+## ======================
+
+logs/
+*.log
+*.txt.bak
+nohup.out
+
+# ======================
+## OS & System Files
+## ======================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ======================
+## Node / Frontend (if added later)
+## ======================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+.parcel-cache/
+
+# ======================
+## Test Results
+## ======================
+
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+.testresults/
+
+# ======================
+## Docker (if added later)
+## ======================
+
+.dockerignore
+docker-compose.override.yml
+
+# ======================
+## Misc
+## ======================
+
+*.bak
+*.tmp
+*.temp
+*.orig
+*.cache
