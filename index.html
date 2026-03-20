@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IdleQuest • Idle RPG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap');
+        
+        :root {
+            --primary: 234 179 8;
+        }
+        
+        .game-container {
+            font-family: 'Press Start 2P', system-ui;
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1e 100%);
+        }
+        
+        .pixel-border {
+            image-rendering: pixelated;
+            border: 4px solid #eab308;
+            box-shadow: 0 0 0 6px #422006,
+                        0 0 0 10px #78350f;
+        }
+        
+        .stat-bar {
+            height: 18px;
+            background: #334155;
+            border: 2px solid #eab308;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #eab308, #f59e0b);
+            transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .character-avatar {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #78350f, #451a03);
+            border: 6px solid #eab308;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 52px;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
+        }
+        
+        .log-entry {
+            animation: logPop 0.4s ease forwards;
+        }
+        
+        @keyframes logPop {
+            0% { opacity: 0; transform: translateY(15px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        .zone-card {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .zone-card:hover {
+            transform: translateY(-8px) scale(1.03);
+            box-shadow: 0 0 25px -5px rgb(234 179 8);
+        }
+        
+        .enemy {
+            animation: enemyBob 1.2s infinite alternate ease-in-out;
+        }
+        
+        .loot-float {
+            position: absolute;
+            color: #22c55e;
+            font-weight: bold;
+            animation: lootFloat 2s forwards;
+            text-shadow: 0 0 8px #22c55e;
+            pointer-events: none;
+        }
+        
+        .header-glow {
+            text-shadow: 
+                0 0 10px rgb(234 179 8),
+                0 0 20px rgb(234 179 8);
+        }
+    </style>
+</head>
+<body class="game-container text-amber-100 min-h-screen">
+    <div class="max-w-7xl mx-auto">
+        <!-- HEADER -->
+        <header class="bg-black border-b-4 border-amber-400 py-3 px-6 flex items-center justify-between">
+            <div class="flex items-center gap-x-3">
+                <div class="w-10 h-10 bg-amber-400 text-black flex items-center justify-center text-3xl rotate-12">⚔️</div>
+                <div>
+                    <h1 class="text-3xl font-bold tracking-widest header-glow text-amber-300">IDLEQUEST</h1>
+                    <p class="text-[10px] text-amber-500 -mt-1">ADVENTURE AWAITS...</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-x-8 text-sm">
+                <div onclick="switchTab(0)" id="tab-0"
+                     class="tab-button flex items-center gap-x-2 px-5 py-2 hover:bg-amber-900 rounded cursor-pointer border border-transparent active">
+                    <i class="fa-solid fa-house"></i>
+                    <span>DASHBOARD</span>
+                </div>
+                <div onclick="switchTab(1)" id="tab-1"
+                     class="tab-button flex items-center gap-x-2 px-5 py-2 hover:bg-amber-900 rounded cursor-pointer border border-transparent">
+                    <i class="fa-solid fa-map"></i>
+                    <span>ZONES</span>
+                </div>
+                <div onclick="switchTab(2)" id="tab-2"
+                     class="tab-button flex items-center gap-x-2 px-5 py-2 hover:bg-amber-900 rounded cursor-pointer border border-transparent">
+                    <i class="fa-solid fa-sword"></i>
+                    <span>COMBAT</span>
+                </div>
+                <div onclick="switchTab(3)" id="tab-3"
+                     class="tab-button flex items-center gap-x-2 px-5 py-2 hover:bg-amber-900 rounded cursor-pointer border border-transparent">
+                    <i class="fa-solid fa-backpack"></i>
+                    <span>INVENTORY</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-x-4">
+                <div class="flex items-center bg-zinc-900 border border-amber-400 rounded-full px-4 py-1 text-xs">
+                    <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse mr-2"></div>
+                    <span id="player-name" class="font-mono">HERO42</span>
+                </div>
+                
+                <div onclick="logout()" 
+                     class="flex items-center justify-center w-9 h-9 bg-zinc-900 hover:bg-red-900 border border-amber-400 rounded-xl cursor-pointer">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </div>
+            </div>
+        </header>
+        
+        <div class="flex">
+            
+            <!-- SIDEBAR CHARACTER -->
+            <div class="w-72 bg-zinc-950 border-r-4 border-amber-400 p-5 flex flex-col">
+                <!-- CHARACTER -->
+                <div class="pixel-border bg-zinc-900 p-4 mb-6">
+                    <div class="flex justify-center mb-3">
+                        <div id="avatar" onclick="changeClass()" 
+                             class="character-avatar text-6xl flex items-center justify-center cursor-pointer">🛡️</div>
+                    </div>
+                    
+                    <div class="text-center">
+                        <input id="hero-name" 
+                               onblur="saveHeroName()"
+                               class="bg-transparent text-center text-xl font-bold text-amber-200 w-full outline-none border-b border-dashed border-amber-400"
+                               value="Sir Valor">
+                    </div>
+                    
+                    <div class="flex justify-center gap-x-2 mt-2 text-xs">
+                        <div id="class-name" 
+                             class="px-3 py-1 bg-amber-900 text-amber-300 rounded-md">WARRIOR</div>
+                    </div>
+                </div>
+                
+                <!-- STATS -->
+                <div class="space-y-5">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1 font-mono">
+                            <div>LVL <span id="level" class="text-amber-300">12</span></div>
+                            <div class="text-emerald-400" id="xp-text">1240 / 2100 XP</div>
+                        </div>
+                        <div class="stat-bar">
+                            <div id="xp-bar" class="stat-fill" style="width: 59%"></div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="flex justify-between text-xs mb-1 font-mono">
+                            <div class="flex items-center gap-x-1">
+                                <i class="fa-solid fa-heart text-red-400"></i>
+                                <span>HP</span>
+                            </div>
+                            <div><span id="hp-current">245</span>/<span id="hp-max">280</span></div>
+                        </div>
+                        <div class="stat-bar">
+                            <div id="hp-bar" class="stat-fill bg-red-500" style="width: 88%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                            <div class="flex items-center gap-x-2 mb-2">
+                                <i class="fa-solid fa-bolt text-yellow-400"></i>
+                                <span class="font-mono">ATK</span>
+                            </div>
+                            <div id="atk-value" class="text-3xl font-bold text-orange-300">38</div>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-x-2 mb-2">
+                                <i class="fa-solid fa-shield-halved text-sky-400"></i>
+                                <span class="font-mono">DEF</span>
+                            </div>
+                            <div id="def-value" class="text-3xl font-bold text-sky-300">24</div>
+                        </div>
+                    </div>
+                    
+                    <!-- GOLD -->
+                    <div class="bg-zinc-900 border border-amber-400 p-3 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-x-3">
+                            <i class="fa-solid fa-coins text-yellow-300 text-2xl"></i>
+                            <div>
+                                <div class="text-xs tracking-widest">GOLD</div>
+                                <div id="gold" class="text-2xl font-bold text-yellow-300">1248</div>
+                            </div>
+                        </div>
+                        <div onclick="claimIdleRewards()" 
+                             class="text-[10px] bg-emerald-900 hover:bg-emerald-700 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-x-1">
+                            <i class="fa-solid fa-clock"></i>
+                            <span>CLAIM</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-auto pt-8">
+                    <div class="text-[10px] font-mono text-center text-amber-500 mb-2">CURRENT ZONE</div>
+                    <div id="current-zone" 
+                         class="bg-zinc-900 border border-amber-400 text-center py-4 rounded-2xl text-sm font-bold">
+                        SHADOW FOREST
+                    </div>
+                </div>
+                
+                <!-- PROGRESS -->
+                <div class="mt-6 text-center">
+                    <div onclick="toggleAutoProgress()" id="auto-btn"
+                         class="inline-flex items-center gap-x-2 bg-green-900 hover:bg-green-700 text-green-100 text-xs px-6 py-2 rounded-3xl cursor-pointer">
+                        <i class="fa-solid fa-play"></i>
+                        <span id="auto-text">AUTO PROGRESS ON</span>
+                    </div>
+                </div>
+                
+                <div class="text-center text-[10px] text-amber-600 mt-auto pt-8">
+                    SESSION TIME: <span id="session-time" class="font-mono">00:00</span>
+                </div>
+            </div>
+            
+            <!-- MAIN CONTENT -->
+            <div class="flex-1 p-6">
+                
+                <!-- DASHBOARD TAB -->
+                <div id="screen-0">
+                    <div class="grid grid-cols-12 gap-6">
+                        
+                        <!-- HERO CARD -->
+                        <div class="col-span-12 lg:col-span-7 bg-zinc-900 border border-amber-400 rounded-3xl p-6 pixel-border">
+                            <div class="flex gap-8">
+                                <!-- LEFT -->
+                                <div class="flex-1">
+                                    <div class="uppercase text-xs tracking-[2px] mb-3 text-amber-400">YOUR HERO</div>
+                                    <h2 id="hero-name-big" class="text-5xl font-bold text-white">SIR VALOR</h2>
+                                    <div class="flex items-center gap-x-4 mt-2">
+                                        <div id="hero-class-big" class="px-5 py-1 bg-orange-900 text-orange-200 text-sm rounded-2xl">WARRIOR</div>
+                                        <div class="flex items-center text-xs bg-zinc-800 px-4 h-7 rounded-2xl">
+                                            <span class="text-emerald-400">LVL</span>
+                                            <span id="level-big" class="ml-2 text-2xl font-bold text-emerald-300">12</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-10 space-y-6">
+                                        <div class="flex items-center">
+                                            <div class="w-28 text-xs font-mono">NEXT LEVEL IN</div>
+                                            <div class="flex-1">
+                                                <div class="stat-bar">
+                                                    <div id="xp-bar-main" class="stat-fill" style="width: 59%"></div>
+                                                </div>
+                                            </div>
+                                            <div id="xp-remaining" class="w-20 text-right text-xs font-mono">860 XP</div>
+                                        </div>
+                                        
+                                        <div onclick="startCombat()" 
+                                             class="flex items-center justify-center gap-x-4 bg-red-700 hover:bg-red-600 transition-colors text-white h-14 rounded-2xl cursor-pointer text-sm tracking-wider">
+                                            <i class="fa-solid fa-skull"></i>
+                                            <span>BEGIN IDLE COMBAT</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- RIGHT -->
+                                <div class="w-52 flex flex-col items-center justify-center border-l border-amber-400 pl-8">
+                                    <div id="hero-emoji" class="text-[110px] leading-none mb-4">🛡️</div>
+                                    <div class="text-xs px-6 py-2 bg-black border border-amber-400 rounded-3xl text-center leading-tight">
+                                        IDLE FOR<br>
+                                        <span id="idle-hours" class="text-amber-300 text-xl">3.4</span><br>
+                                        HOURS
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- LAST LOOT -->
+                        <div class="col-span-12 lg:col-span-5 bg-zinc-900 border border-amber-400 rounded-3xl p-6 pixel-border">
+                            <div class="uppercase text-xs mb-4 flex items-center gap-x-2">
+                                <i class="fa-solid fa-gem"></i>
+                                <span>LATEST LOOT</span>
+                            </div>
+                            
+                            <div id="last-loot" class="space-y-4">
+                                <!-- populated by JS -->
+                            </div>
+                        </div>
+                        
+                        <!-- COMBAT LOG -->
+                        <div class="col-span-12 bg-zinc-900 border border-amber-400 rounded-3xl p-5 pixel-border h-80 overflow-hidden flex flex-col">
+                            <div class="flex justify-between items-baseline border-b border-amber-400 pb-3 mb-3">
+                                <div class="uppercase text-xs tracking-widest">Combat Log</div>
+                                <div onclick="clearLog()" class="text-[10px] text-red-300 cursor-pointer hover:text-red-400">CLEAR</div>
+                            </div>
+                            
+                            <div id="combat-log" class="flex-1 font-mono text-xs overflow-y-auto space-y-3 text-amber-200 custom-scroll">
+                                <!-- populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ZONES TAB -->
+                <div id="screen-1" class="hidden">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-x-3">
+                        <i class="fa-solid fa-map-location-dot"></i>
+                        <span>EXPLORE THE REALM</span>
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="zones-grid">
+                        <!-- populated by JS -->
+                    </div>
+                </div>
+                
+                <!-- COMBAT TAB -->
+                <div id="screen-2" class="hidden">
+                    <div class="max-w-md mx-auto">
+                        <div class="bg-zinc-900 border-4 border-red-500 rounded-3xl p-6 text-center">
+                            <div class="uppercase text-red-400 text-xs mb-1 tracking-widest">ENEMY ENCOUNTER</div>
+                            <div id="enemy-name" class="text-4xl font-bold text-white mb-1">GOBLIN SCOUT</div>
+                            <div id="enemy-level" class="text-xs text-red-300">LVL 9</div>
+                            
+                            <div class="flex justify-center my-8">
+                                <div id="enemy-emoji" onclick="manualAttack()" 
+                                     class="enemy text-8xl w-40 h-40 flex items-center justify-center bg-zinc-800 rounded-2xl border-4 border-red-400 cursor-pointer">👹</div>
+                            </div>
+                            
+                            <div class="stat-bar mx-auto max-w-[220px]">
+                                <div id="enemy-hp-bar" class="stat-fill bg-red-500" style="width: 72%"></div>
+                            </div>
+                            <div class="flex justify-between text-xs mt-2 font-mono">
+                                <div>ENEMY HP</div>
+                                <div><span id="enemy-hp-text">42</span>/68</div>
+                            </div>
+                            
+                            <div class="flex gap-x-4 mt-10">
+                                <button onclick="manualAttack()" 
+                                        class="flex-1 bg-red-600 hover:bg-red-500 transition-all py-6 rounded-2xl text-white font-bold text-sm tracking-widest flex items-center justify-center gap-x-2">
+                                    <i class="fa-solid fa-swords"></i>
+                                    <span>ATTACK</span>
+                                </button>
+                                
+                                <button onclick="fleeCombat()" 
+                                        class="flex-1 bg-zinc-700 hover:bg-zinc-600 transition-all py-6 rounded-2xl text-white font-bold text-sm tracking-widest">
+                                    FLEE
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-8 text-center text-xs text-amber-400">Your damage: <span id="player-dmg-preview" class="font-bold text-amber-200">28</span></div>
+                    </div>
+                </div>
+                
+                <!-- INVENTORY TAB -->
+                <div id="screen-3" class="hidden">
+                    <div class="flex justify-between items-end mb-6">
+                        <h2 class="text-xl font-bold">INVENTORY</h2>
+                        <div class="text-xs bg-emerald-900 text-emerald-100 px-5 py-2 rounded-3xl">14 / 24 SLOTS</div>
+                    </div>
+                    
+                    <div class="grid grid-cols-4 gap-4" id="inventory-grid">
+                        <!-- populated by JS -->
+                    </div>
+                    
+                    <div class="mt-12">
+                        <div class="text-xs uppercase mb-4 text-amber-400">EQUIPPED</div>
+                        <div class="flex gap-6" id="equipped-items">
+                            <!-- populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- RIGHT RAIL -->
+            <div class="w-64 bg-zinc-950 border-l-4 border-amber-400 p-6 hidden xl:flex flex-col">
+                <div class="text-xs font-mono mb-8 bg-black p-4 rounded-2xl border border-amber-300">
+                    <div class="flex justify-between py-3 border-b border-amber-900">
+                        <span class="text-gray-400">TIME PLAYED</span>
+                        <span id="total-time" class="font-bold text-amber-300">14h 22m</span>
+                    </div>
+                    <div class="flex justify-between py-3 border-b border-amber-900">
+                        <span class="text-gray-400">ENEMIES SLAIN</span>
+                        <span id="enemies-slain" class="font-bold text-amber-300">187</span>
+                    </div>
+                    <div class="flex justify-between py-3">
+                        <span class="text-gray-400">ITEMS FOUND</span>
+                        <span id="items-found" class="font-bold text-amber-300">63</span>
+                    </div>
+                </div>
+                
+                <div class="mt-auto">
+                    <div id="next-reward" 
+                         class="border border-dashed border-amber-400 rounded-2xl p-5 text-center text-xs">
+                        <div class="text-emerald-400 mb-1">NEXT IDLE REWARD IN</div>
+                        <div id="next-reward-time" class="font-mono text-4xl text-white">23</div>
+                        <div class="text-[10px]">minutes</div>
+                    </div>
+                </div>
+                
+                <div onclick="prestigeReset()" 
+                     class="mt-8 text-center text-[10px] text-purple-400 hover:text-purple-300 cursor-pointer">
+                    PRESTIGE RESET <i class="fa-solid fa-arrow-rotate-right"></i>
+                </div>
+                
+                <!-- MINI MAP -->
+                <div class="mt-auto pt-8">
+                    <div class="uppercase text-[10px] mb-3 text-center text-amber-500">WORLD MAP</div>
+                    <div class="aspect-square bg-[#0a0a0f] border border-amber-400 rounded-3xl p-4 flex items-center justify-center text-[90px] relative overflow-hidden">
+                        <div class="absolute inset-0 bg-[radial-gradient(#eab308_1px,transparent_1px)] bg-[length:18px_18px] opacity-10"></div>
+                        🌲
+                        <div class="absolute bottom-6 left-8 text-xs bg-black/70 px-3 py-1 rounded">YOU</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- TOAST -->
+    <div id="toast" onclick="this.classList.add('hidden')" 
+         class="hidden fixed bottom-6 right-6 bg-zinc-800 border border-emerald-400 text-emerald-300 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-x-3">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toast-text" class="font-medium"></span>
+    </div>
+    
+    <!-- GAME OVER MODAL -->
+    <div onclick="if(event.target.id === 'modal-backdrop') hideModal()" id="modal-backdrop"
+         class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div onclick="event.stopImmediatePropagation()" 
+             class="max-w-md w-full bg-zinc-900 border-4 border-amber-400 rounded-3xl p-8 text-center">
+            <div class="text-7xl mb-6">💀</div>
+            <h3 class="text-3xl font-bold mb-2">YOUR HERO FELL...</h3>
+            <p class="text-amber-400 text-sm mb-8">But fear not! Your progress has been saved.</p>
+            
+            <div class="grid grid-cols-2 gap-4 text-left text-xs mb-10">
+                <div class="bg-black p-4 rounded-2xl">
+                    <div class="text-amber-400">FINAL LEVEL</div>
+                    <div id="modal-level" class="text-6xl font-bold text-white">12</div>
+                </div>
+                <div class="bg-black p-4 rounded-2xl">
+                    <div class="text-amber-400">GOLD EARNED</div>
+                    <div id="modal-gold" class="text-6xl font-bold text-yellow-400">845</div>
+                </div>
+            </div>
+            
+            <button onclick="hideModal(); showScreen(0)" 
+                    class="w-full h-14 bg-amber-400 text-black font-bold rounded-2xl">CONTINUE ADVENTURING</button>
+        </div>
+    </div>
+    
+    <script>
+        // Tailwind script run
+        function initializeTailwind() {
+            tailwind.config = {
+                content: [],
+                theme: {
+                    extend: {}
+                }
+            }
+        }
+        
+        // Game State
+        let gameState = {
+            hero: {
+                name: "Sir Valor",
+                class: "Warrior",
+                emoji: "🛡️",
+                level: 12,
+                xp: 1240,
+                xpToNext: 2100,
+                hp: 245,
+                maxHp: 280,
+                atk: 38,
+                def: 24,
+                gold: 1248
+            },
+            currentZone: "Shadow Forest",
+            autoProgress: true,
+            enemiesSlain: 187,
+            itemsFound: 63,
+            totalTimePlayed: "14h 22m",
+            combatLog: [],
+            inventory: [
+                { id: 1, name: "Iron Sword", type: "weapon", rarity: "common", bonus: 8, emoji: "⚔️" },
+                { id: 2, name: "Leather Vest", type: "armor", rarity: "common", bonus: 5, emoji: "🧥" },
+                { id: 3, name: "Health Potion", type: "consumable", rarity: "uncommon", bonus: 30, emoji: "🧪" },
+                { id: 4, name: "Ring of Power", type: "accessory", rarity: "rare", bonus: 12, emoji: "💍" }
+            ],
+            equipped: {
+                weapon: { id: 1, name: "Iron Sword", bonus: 8, emoji: "⚔️" },
+                armor: { id: 2, name: "Leather Vest", bonus: 5, emoji: "🧥" }
+            },
+            zones: [
+                { id: 1, name: "Whispering Woods", emoji: "🌲", level: 1, unlocked: true, active: true },
+                { id: 2, name: "Shadow Forest", emoji: "🌑", level: 8, unlocked: true, active: false },
+                { id: 3, name: "Cursed Ruins", emoji: "🏛️", level: 15, unlocked: false, active: false },
+                { id: 4, name: "Dragon Peaks", emoji: "🏔️", level: 27, unlocked: false, active: false }
+            ],
+            lastLoot: []
+        }
+        
+        let sessionStart = Date.now()
+        let lastTick = Date.now()
+        let gameInterval = null
+        let currentEnemy = null
+        let isInCombat = false
+        let tabIndex = 0
+        
+        const classes = [
+            { name: "Warrior", emoji: "🛡️", color: "orange" },
+            { name: "Mage", emoji: "🔥", color: "purple" },
+            { name: "Rogue", emoji: "🗡️", color: "emerald" }
+        ]
+        let currentClassIndex = 0
+        
+        // Web Audio for blips
+        let audioContext
+        
+        function playSound(type) {
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)()
+            
+            const osc = audioContext.createOscillator()
+            const gain = audioContext.createGain()
+            
+            osc.connect(gain)
+            gain.connect(audioContext.destination)
+            
+            if (type === "hit") {
+                osc.frequency.setValueAtTime(220, audioContext.currentTime)
+                gain.gain.value = 0.6
+                osc.type = "sawtooth"
+                gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2)
+            } 
+            else if (type === "loot") {
+                osc.frequency.setValueAtTime(880, audioContext.currentTime)
+                gain.gain.value = 0.4
+                osc.type = "sine"
+                gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.6)
+            } 
+            else if (type === "level") {
+                osc.frequency.setValueAtTime(440, audioContext.currentTime)
+                gain.gain.value = 0.7
+                setTimeout(() => {
+                    osc.frequency.setValueAtTime(660, audioContext.currentTime)
+                }, 80)
+                setTimeout(() => {
+                    osc.frequency.setValueAtTime(880, audioContext.currentTime)
+                }, 220)
+            }
+            
+            osc.start()
+            osc.stop(audioContext.currentTime + 0.8)
+        }
+        
+        function addToLog(message, color = "amber") {
+            const logContainer = document.getElementById("combat-log")
+            const entry = document.createElement("div")
+            entry.className = `log-entry flex gap-x-3 text-${color}-200`
+            entry.innerHTML = `
+                <span class="font-bold text-[10px] text-${color}-400 whitespace-nowrap">[NOW]</span>
+                <span>${message}</span>
+            `
+            logContainer.appendChild(entry)
+            
+            // keep only 9 entries
+            if (logContainer.children.length > 9) {
+                logContainer.removeChild(logContainer.children[0])
+            }
+            
+            logContainer.scrollTop = 9999
+        }
+        
+        function updateAllUI() {
+            // hero name
+            document.getElementById("hero-name").value = gameState.hero.name
+            document.getElementById("hero-name-big").textContent = gameState.hero.name.toUpperCase()
+            
+            // class
+            document.getElementById("class-name").textContent = gameState.hero.class.toUpperCase()
+            document.getElementById("hero-class-big").textContent = gameState.hero.class.toUpperCase()
+            document.getElementById("hero-class-big").className = `px-5 py-1 bg-${classes[currentClassIndex].color}-900 text-${classes[currentClassIndex].color}-200 text-sm rounded-2xl`
+            
+            // avatar
+            document.getElementById("avatar").innerHTML = gameState.hero.emoji
+            document.getElementById("hero-emoji").innerHTML = gameState.hero.emoji
+            
+            // level
+            document.getElementById("level").textContent = gameState.hero.level
+            document.getElementById("level-big").textContent = gameState.hero.level
+            
+            // xp
+            const xpPercent = Math.floor((gameState.hero.xp / gameState.hero.xpToNext) * 100)
+            document.getElementById("xp-bar").style.width = xpPercent + "%"
+            document.getElementById("xp-bar-main").style.width = xpPercent + "%"
+            document.getElementById("xp-text").innerHTML = `${gameState.hero.xp} <span class="text-amber-500">/</span> ${gameState.hero.xpToNext}`
+            document.getElementById("xp-remaining").textContent = (gameState.hero.xpToNext - gameState.hero.xp) + " XP"
+            
+            // HP
+            const hpPercent = Math.floor((gameState.hero.hp / gameState.hero.maxHp) * 100)
+            document.getElementById("hp-bar").style.width = hpPercent + "%"
+            document.getElementById("hp-current").textContent = Math.floor(gameState.hero.hp)
+            document.getElementById("hp-max").textContent = gameState.hero.maxHp
+            
+            // stats
+            document.getElementById("atk-value").textContent = gameState.hero.atk
+            document.getElementById("def-value").textContent = gameState.hero.def
+            
+            // gold
+            document.getElementById("gold").textContent = gameState.hero.gold
+            
+            // zone
+            document.getElementById("current-zone").innerHTML = `
+                <span class="text-xl">${gameState.currentZone}</span>
+            `
+            
+            // stats rail
+            document.getElementById("enemies-slain").textContent = gameState.enemiesSlain
+            document.getElementById("items-found").textContent = gameState.itemsFound
+        }
+        
+        function renderZones() {
+            const container = document.getElementById("zones-grid")
+            container.innerHTML = ""
+            
+            gameState.zones.forEach(zone => {
+                const active = zone.active ? "ring-2 ring-offset-4 ring-offset-zinc-950 ring-amber-400" : ""
+                
+                const el = document.createElement("div")
+                el.className = `zone-card bg-zinc-900 border border-amber-400 rounded-3xl p-6 cursor-pointer ${active}`
+                el.innerHTML = `
+                    <div class="flex justify-between">
+                        <div class="text-5xl">${zone.emoji}</div>
+                        ${zone.unlocked ? `<div class="text-emerald-300 text-xs h-fit px-3 pt-1 pb-0.5 border border-emerald-400 rounded">UNLOCKED</div>` : `<div class="text-red-400 text-xs h-fit px-3 pt-1 pb-0.5 border border-red-400 rounded">LOCKED</div>`}
+                    </div>
+                    <div class="mt-8">
+                        <div class="font-bold text-xl">${zone.name}</div>
+                        <div class="text-xs text-amber-400">RECOMMENDED LVL ${zone.level}</div>
+                    </div>
+                `
+                el.onclick = () => {
+                    if (!zone.unlocked) {
+                        showToast("Zone locked! Reach level " + zone.level, "amber")
+                        return
+                    }
+                    gameState.currentZone = zone.name
+                    gameState.zones.forEach(z => z.active = false)
+                    zone.active = true
+                    renderZones()
+                    updateAllUI()
+                    showToast("Travelled to " + zone.name, "emerald")
+                }
+                container.appendChild(el)
+            })
+        }
+        
+        function renderInventory() {
+            const container = document.getElementById("inventory-grid")
+            container.innerHTML = ""
+            
+            gameState.inventory.forEach(item => {
+                const div = document.createElement("div")
+                div.className = `bg-zinc-900 border border-amber-400 hover:border-amber-300 transition-colors rounded-2xl p-4 cursor-pointer text-center`
+                div.innerHTML = `
+                    <div class="text-5xl mb-3">${item.emoji}</div>
+                    <div class="text-xs font-bold">${item.name}</div>
+                    <div class="text-[10px] text-amber-400">${item.type}</div>
+                    <div class="text-emerald-400 text-xs mt-4">+${item.bonus}</div>
+                `
+                div.onclick = () => equipItem(item)
+                container.append(div)
+            })
+            
+            // equipped
+            const equippedContainer = document.getElementById("equipped-items")
+            equippedContainer.innerHTML = `
+                <div onclick="unequipSlot('weapon')" class="flex-1 bg-zinc-900 border border-amber-400 rounded-3xl p-5 cursor-pointer">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-xs text-orange-400">WEAPON</div>
+                            <div class="font-bold">${gameState.equipped.weapon.name}</div>
+                        </div>
+                        <div class="text-4xl">${gameState.equipped.weapon.emoji}</div>
+                    </div>
+                    <div class="text-xs text-emerald-400 mt-6">+${gameState.equipped.weapon.bonus} ATK</div>
+                </div>
+                
+                <div onclick="unequipSlot('armor')" class="flex-1 bg-zinc-900 border border-amber-400 rounded-3xl p-5 cursor-pointer">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-xs text-sky-400">ARMOR</div>
+                            <div class="font-bold">${gameState.equipped.armor.name}</div>
+                        </div>
+                        <div class="text-4xl">${gameState.equipped.armor.emoji}</div>
+                    </div>
+                    <div class="text-xs text-emerald-400 mt-6">+${gameState.equipped.armor.bonus} DEF</div>
+                </div>
+            `
+        }
+        
+        function equipItem(item) {
+            if (item.type === "weapon") {
+                gameState.equipped.weapon = item
+            } else if (item.type === "armor") {
+                gameState.equipped.armor = item
+            } else {
+                showToast("Cannot equip " + item.type, "amber")
+                return
+            }
+            
+            gameState.hero.atk = 32 + Math.floor(Math.random() * 18)
+            gameState.hero.def = 18 + Math.floor(Math.random() * 14)
+            
+            renderInventory()
+            updateAllUI()
+            showToast("Equipped " + item.name, "emerald")
+            playSound("loot")
+        }
+        
+        function unequipSlot(slot) {
+            if (slot === "weapon") {
+                gameState.equipped.weapon = { id: 0, name: "Fists", bonus: 3, emoji: "👊" }
+            } else {
+                gameState.equipped.armor = { id: 0, name: "Clothes", bonus: 2, emoji: "👕" }
+            }
+            renderInventory()
+            updateAllUI()
+        }
+        
+        function renderLastLoot() {
+            const container = document.getElementById("last-loot")
+            container.innerHTML = ""
+            
+            if (gameState.lastLoot.length === 0) {
+                container.innerHTML = `
+                    <div class="opacity-30 italic text-xs">Nothing yet...</div>
+                `
+                return
+            }
+            
+            gameState.lastLoot.forEach(loot => {
+                const entry = document.createElement("div")
+                entry.className = "flex justify-between items-center border-b border-dotted border-amber-400 last:border-none pb-4"
+                entry.innerHTML = `
+                    <div class="flex items-center gap-x-4">
+                        <span class="text-3xl">${loot.emoji}</span>
+                        <div>
+                            <div class="text-sm">${loot.name}</div>
+                            <div class="text-emerald-400 text-xs">+${loot.bonus} ${loot.stat}</div>
+                        </div>
+                    </div>
+                    <div class="text-amber-300 text-xs font-mono">${loot.time}</div>
+                `
+                container.appendChild(entry)
+            })
+        }
+        
+        function tick() {
+            const now = Date.now()
+            const delta = (now - lastTick) / 1000
+            lastTick = now
+            
+            // idle progress
+            if (gameState.autoProgress && !isInCombat) {
+                // gain xp
+                const xpGain = Math.max(4, Math.floor(gameState.hero.level * 1.8 * delta))
+                gameState.hero.xp += xpGain
+                
+                // chance to gain gold
+                if (Math.random() < 0.1) {
+                    gameState.hero.gold += Math.floor(3 + Math.random() * 8)
+                }
+                
+                // level up?
+                if (gameState.hero.xp >= gameState.hero.xpToNext) {
+                    levelUp()
+                }
+                
+                // random combat log entry
+                if (Math.random() < 0.08) {
+                    const messages = [
+                        "You defeated a wild beast",
+                        "Found a shiny coin",
+                        "The forest whispers...",
+                        "Gained some experience"
+                    ]
+                    addToLog(messages[Math.floor(Math.random() * messages.length)], "emerald")
+                }
+            }
+            
+            // update session time
+            const elapsed = Math.floor((now - sessionStart) / 1000)
+            const minutes = Math.floor(elapsed / 60)
+            const seconds = elapsed % 60
+            document.getElementById("session-time").textContent = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+            
+            updateAllUI()
+        }
+        
+        function levelUp() {
+            gameState.hero.level++
+            gameState.hero.xp = Math.floor(gameState.hero.xp * 0.2)
+            gameState.hero.xpToNext = Math.floor(gameState.hero.xpToNext * 1.6)
+            gameState.hero.maxHp = Math.floor(gameState.hero.maxHp * 1.25)
+            gameState.hero.hp = gameState.hero.maxHp
+            gameState.hero.atk += 5
+            gameState.hero.def += 3
+            
+            playSound("level")
+            showToast("LEVEL UP! You are now level " + gameState.hero.level, "violet")
+            
+            const logMsg = `🏆 Reached level <span class="text-purple-300">${gameState.hero.level}</span>`
+            addToLog(logMsg, "violet")
+            
+            // occasional loot on level up
+            if (Math.random() > 0.5) {
+                grantRandomLoot()
+            }
+            
+            updateAllUI()
+        }
+        
+        function grantRandomLoot() {
+            const possibleLoot = [
+                { name: "Magic Ring", emoji: "💍", bonus: 7, stat: "ATK" },
+                { name: "Steel Helm", emoji: "⛑️", bonus: 9, stat: "DEF" },
+                { name: "Ruby", emoji: "🔴", bonus: 65, stat: "GOLD" }
+            ]
+            
+            const loot = possibleLoot[Math.floor(Math.random() * possibleLoot.length)]
+            gameState.lastLoot.unshift(loot)
+            if (gameState.lastLoot.length > 3) gameState.lastLoot.pop()
+            
+            if (loot.stat === "GOLD") {
+                gameState.hero.gold += loot.bonus
+            } else {
+                gameState.inventory.push({
+                    id: Date.now(),
+                    name: loot.name,
+                    type: "accessory",
+                    rarity: "rare",
+                    bonus: loot.bonus,
+                    emoji: loot.emoji
+                })
+            }
+            
+            renderLastLoot()
+            renderInventory()
+            playSound("loot")
+            
+            const float = document.createElement("div")
+            float.textContent = "+" + loot.bonus
+            float.className = "loot-float text-xl"
+            float.style.left = (Math.random() * 300 + 400) + "px"
+            float.style.bottom = "120px"
+            document.body.appendChild(float)
+            
+            setTimeout(() => {
+                float.remove()
+            }, 2100)
+        }
+        
+        function startCombat() {
+            if (isInCombat) return
+            showScreen(2)
+            
+            const enemyNames = ["Goblin Scout", "Forest Troll", "Shadow Wraith", "Fire Imp", "Cave Bat"]
+            const emojis = ["👹", "🧌", "👻", "🔥", "🦇"]
+            
+            const idx = Math.floor(Math.random() * enemyNames.length)
+            
+            currentEnemy = {
+                name: enemyNames[idx],
+                emoji: emojis[idx],
+                level: Math.max(3, gameState.hero.level - 3 + Math.floor(Math.random() * 7)),
+                maxHp: 45 + gameState.hero.level * 11,
+                hp: 45 + gameState.hero.level * 11,
+                atk: 12 + Math.floor(Math.random() * 18)
+            }
+            
+            isInCombat = true
+            
+            document.getElementById("enemy-name").textContent = currentEnemy.name
+            document.getElementById("enemy-level").textContent = `LVL ${currentEnemy.level}`
+            document.getElementById("enemy-emoji").innerHTML = currentEnemy.emoji
+            
+            updateEnemyUI()
+            addToLog(`⚔️ Encountered <span class="text-red-400">${currentEnemy.name}</span>`, "red")
+        }
+        
+        function updateEnemyUI() {
+            if (!currentEnemy) return
+            const perc = Math.max(0, Math.floor(currentEnemy.hp / currentEnemy.maxHp * 100))
+            document.getElementById("enemy-hp-bar").style.width = perc + "%"
+            document.getElementById("enemy-hp-text").textContent = Math.ceil(currentEnemy.hp)
+            document.getElementById("player-dmg-preview").textContent = Math.floor(gameState.hero.atk * 0.7)
+        }
+        
+        function manualAttack() {
+            if (!currentEnemy || !isInCombat) return
+            
+            // player hits enemy
+            const dmg = Math.max(8, Math.floor(gameState.hero.atk * (0.6 + Math.random())))
+            currentEnemy.hp -= dmg
+            
+            // visual feedback
+            const enemyEl = document.getElementById("enemy-emoji")
+            enemyEl.style.transform = "scale(0.6)"
+            setTimeout(() => {
+                enemyEl.style.transform = "scale(1)"
+            }, 60)
+            
+            playSound("hit")
+            addToLog(`You hit for <span class="text-orange-300">${dmg}</span> damage`, "orange")
+            
+            updateEnemyUI()
+            
+            if (currentEnemy.hp <= 0) {
+                enemyDefeated()
+                return
+            }
+            
+            // enemy retaliates
+            setTimeout(() => {
+                if (!currentEnemy || !isInCombat) return
+                
+                const enemyDmg = Math.max(5, Math.floor(currentEnemy.atk - gameState.hero.def / 3))
+                gameState.hero.hp = Math.max(0, gameState.hero.hp - enemyDmg)
+                
+                addToLog(`Enemy hits you for <span class="text-red-300">${enemyDmg}</span>`, "red")
+                
+                const hpPercent = Math.floor(gameState.hero.hp / gameState.hero.maxHp * 100)
+                document.getElementById("hp-bar").style.width = hpPercent + "%"
+                document.getElementById("hp-current").textContent = Math.floor(gameState.hero.hp)
+                
+                if (gameState.hero.hp <= 0) {
+                    heroDied()
+                }
+            }, 380)
+        }
+        
+        function enemyDefeated() {
+            isInCombat = false
+            gameState.enemiesSlain++
+            
+            addToLog(`💥 <span class="text-emerald-400">${currentEnemy.name}</span> defeated!`, "emerald")
+            
+            // loot
+            gameState.hero.gold += 18 + Math.floor(Math.random() * 45)
+            grantRandomLoot()
+            
+            // small xp
+            gameState.hero.xp += 85 + Math.floor(Math.random() * 65)
+            if (gameState.hero.xp >= gameState.hero.xpToNext) levelUp()
+            
+            showToast("Victory! + " + (18 + Math.floor(Math.random() * 45)) + " gold", "emerald")
+            
+            // return to dashboard
+            setTimeout(() => {
+                showScreen(0)
+                currentEnemy = null
+            }, 1250)
+            
+            updateAllUI()
+        }
+        
+        function heroDied() {
+            isInCombat = false
+            showModal()
+            addToLog("💀 HERO DEFEATED", "red")
+        }
+        
+        function fleeCombat() {
+            if (!isInCombat) return
+            isInCombat = false
+            addToLog("You fled from battle...", "amber")
+            showScreen(0)
+            currentEnemy = null
+        }
+        
+        function showModal() {
+            document.getElementById("modal-backdrop").classList.remove("hidden")
+            document.getElementById("modal-level").textContent = gameState.hero.level
+            document.getElementById("modal-gold").textContent = gameState.hero.gold
+        }
+        
+        function hideModal() {
+            document.getElementById("modal-backdrop").classList.add("hidden")
+            // revive hero
+            gameState.hero.hp = Math.floor(gameState.hero.maxHp * 0.6)
+            updateAllUI()
+        }
+        
+        function claimIdleRewards() {
+            const rewardGold = 35 + Math.floor(Math.random() * 110)
+            gameState.hero.gold += rewardGold
+            gameState.hero.xp += 120
+            showToast(`+${rewardGold} gold from idle progress!`, "yellow")
+            playSound("loot")
+            updateAllUI()
+            
+            if (gameState.hero.xp >= gameState.hero.xpToNext) {
+                levelUp()
+            }
+        }
+        
+        function toggleAutoProgress() {
+            gameState.autoProgress = !gameState.autoProgress
+            const btn = document.getElementById("auto-btn")
+            const txt = document.getElementById("auto-text")
+            
+            if (gameState.autoProgress) {
+                btn.classList.remove("bg-red-900", "text-red-200")
+                btn.classList.add("bg-green-900", "text-green-100")
+                txt.textContent = "AUTO PROGRESS ON"
+            } else {
+                btn.classList.remove("bg-green-900", "text-green-100")
+                btn.classList.add("bg-red-900", "text-red-200")
+                txt.textContent = "AUTO PROGRESS OFF"
+            }
+        }
+        
+        function changeClass() {
+            currentClassIndex = (currentClassIndex + 1) % classes.length
+            const cls = classes[currentClassIndex]
+            
+            gameState.hero.class = cls.name
+            gameState.hero.emoji = cls.emoji
+            
+            updateAllUI()
+            showToast("Changed class to " + cls.name, "amber")
+        }
+        
+        function saveHeroName() {
+            const input = document.getElementById("hero-name")
+            if (input.value.trim() !== "") {
+                gameState.hero.name = input.value.trim()
+                updateAllUI()
+            }
+        }
+        
+        function showToast(text, color = "emerald") {
+            const toast = document.getElementById("toast")
+            const toastText = document.getElementById("toast-text")
+            toastText.textContent = text
+            toast.classList.remove("hidden")
+            toast.style.borderColor = color === "amber" ? "#f59e0b" : "#10b981"
+            
+            setTimeout(() => {
+                toast.classList.add("hidden")
+            }, 2600)
+        }
+        
+        function switchTab(n) {
+            tabIndex = n
+            document.querySelectorAll(".tab-button").forEach((tab, index) => {
+                if (index === n) {
+                    tab.classList.add("active", "border-amber-400", "bg-zinc-900")
+                } else {
+                    tab.classList.remove("active", "border-amber-400", "bg-zinc-900")
+                }
+            })
+            showScreen(n)
+        }
+        
+        function showScreen(n) {
+            for (let i = 0; i < 4; i++) {
+                const screen = document.getElementById("screen-" + i)
+                if (screen) {
+                    screen.classList.toggle("hidden", i !== n)
+                }
+            }
+            
+            if (n === 3) {
+                renderInventory()
+            }
+        }
+        
+        function clearLog() {
+            const logContainer = document.getElementById("combat-log")
+            logContainer.innerHTML = ""
+            addToLog("Log cleared", "amber")
+        }
+        
+        function prestigeReset() {
+            if (confirm("Prestige your hero?\n\nAll progress will be reset but you will gain a permanent multiplier.")) {
+                showToast("Prestige complete! (demo)", "violet")
+                gameState.hero.level = 1
+                gameState.hero.xp = 0
+                gameState.hero.xpToNext = 420
+                gameState.hero.gold = 120
+                gameState.hero.atk = 12
+                gameState.hero.def = 8
+                updateAllUI()
+            }
+        }
+        
+        function logout() {
+            if (confirm("Return to login screen?")) {
+                window.location.reload()
+            }
+        }
+        
+        function generateFakeLogEntries() {
+            const messages = [
+                ["Slayed a goblin", "emerald"],
+                ["Discovered a chest", "amber"],
+                ["Leveled up!", "violet"],
+                ["Found a rusty sword", "sky"]
+            ]
+            
+            for (let i = 0; i < 5; i++) {
+                const msg = messages[Math.floor(Math.random() * messages.length)]
+                const entry = document.createElement("div")
+                entry.className = `flex gap-x-3 text-${msg[1]}-200 text-xs`
+                entry.innerHTML = `
+                    <span class="opacity-60">[${(12 + i).toString().padStart(2, '0')}:2${i}]</span>
+                    <span>${msg[0]}</span>
+                `
+                document.getElementById("combat-log").appendChild(entry)
+            }
+        }
+        
+        function simulateIdleProgress() {
+            // simulate offline gains
+            setTimeout(() => {
+                if (Math.random() > 0.3) {
+                    gameState.hero.gold += 320
+                    gameState.lastLoot = [
+                        { name: "Steel Axe", emoji: "🪓", bonus: 14, stat: "ATK", time: "just now" },
+                        { name: "Mana Crystal", emoji: "🔮", bonus: 45, stat: "XP", time: "2m ago" }
+                    ]
+                    renderLastLoot()
+                    updateAllUI()
+                }
+            }, 1350)
+        }
+        
+        // Main initialization
+        function initializeGame() {
+            initializeTailwind()
+            
+            // initial log
+            const logContainer = document.getElementById("combat-log")
+            logContainer.innerHTML = ""
+            generateFakeLogEntries()
+            
+            // render zones
+            renderZones()
+            
+            // render loot
+            renderLastLoot()
+            
+            // update UI
+            updateAllUI()
+            
+            // start game tick
+            gameInterval = setInterval(tick, 680)
+            
+            // simulate some idle rewards
+            simulateIdleProgress()
+            
+            // keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.metaKey && e.key === "k") {
+                    e.preventDefault()
+                    claimIdleRewards()
+                }
+                
+                if (e.key === "/" && document.getElementById("screen-2").classList.contains("hidden") === false) {
+                    manualAttack()
+                }
+            })
+            
+            // welcome toast
+            setTimeout(() => {
+                showToast("Welcome back to IdleQuest!", "amber")
+            }, 1200)
+            
+            // make sure first tab is visible
+            showScreen(0)
+            
+            // demo: add a log every 8 seconds
+            setInterval(() => {
+                if (Math.random() > 0.6 && !isInCombat) {
+                    const r = Math.random()
+                    if (r < 0.4) addToLog("You feel stronger...", "amber")
+                    else if (r < 0.7) addToLog("The wind carries gold dust", "yellow")
+                }
+            }, 8000)
+            
+            console.log('%c🎮 IdleQuest initialized successfully!', 'font-family:monospace;color:#fbbf24;font-size:10px')
+        }
+        
+        // Boot game
+        window.onload = initializeGame
+    </script>
+</body>
+</html>
