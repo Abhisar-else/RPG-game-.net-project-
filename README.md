@@ -1,259 +1,246 @@
-# ⚔️ IdleQuest — Web-Based Idle RPG Adventure
+# IdleQuest — C# .NET Backend Architecture
 
-> A full-stack idle RPG built with **ASP.NET Core 8 MVC**, **Entity Framework Core**, **Bootstrap 5**, and **Razor Pages**.  
-> Developed as a Practical Skill Journal project at **Symbiosis University of Applied Sciences, Indore**.
-
----
-
-## 📖 Overview
-
-**IdleQuest** is a browser-based idle RPG where players register an account, create a hero, and watch them automatically progress through the world — gaining XP, leveling up, looting items, and battling enemies. All game progression runs server-side, making it a true idle experience.
-
-The project demonstrates a complete full-stack development cycle:
-- User authentication with ASP.NET Core Identity  
-- Game entity modeling with Entity Framework Core  
-- Responsive UI with Bootstrap 5 and Razor Views  
-- Session state management and CRUD operations  
+> **Multiplayer-ready, event-driven, clean DDD backend for the IdleQuest Idle RPG.**
 
 ---
 
-## 🎮 Game Flow
+## Project Structure
 
 ```
-Register / Login
-       ↓
- Create Character
-       ↓
-  Explore Zones  ──→  Fight Enemies  ──→  Gain XP & Items
-       ↓
-   Level Up  ──→  Stronger Stats  ──→  New Zones
+IdleQuest.Backend/
+└── src/
+    ├── IdleQuest.Domain/          # Core business logic — zero framework deps
+    │   └── Models.cs              # Aggregates, value objects, events, helpers
+    │
+    ├── IdleQuest.Application/     # Use cases, interfaces, DTOs
+    │   └── Application.cs         # Service contracts + full service implementations
+    │
+    ├── IdleQuest.Infrastructure/  # EF Core, Redis, SignalR, JWT
+    │   └── Infrastructure.cs      # DbContext, repositories, auth, caching, hub
+    │
+    └── IdleQuest.API/             # ASP.NET Core Web API
+        ├── API.cs                 # Controllers, middleware, background services
+        └── Program.cs             # DI composition root + middleware pipeline
 ```
 
 ---
 
-## ✨ Features
+## Architecture Overview
 
-### 🧑 User Module
-- Register and log in securely via **ASP.NET Core Identity**
-- Persistent user session with profile page
-- Password hashing and role-based access
-
-### ⚔️ Character Module
-- Create a character with a name and class (Warrior, Mage, Rogue)
-- Stats: HP, Attack, Defense, Level, XP
-- Idle XP gain calculated on each session tick
-
-### 🐉 Combat System
-- Idle combat resolution against randomly selected enemies
-- `CombatLog` entity records each fight with outcome and timestamp
-- Item drops on enemy defeat
-
-### 🎒 Inventory & Items
-- `Item` entity with name, type, rarity, and stat bonuses
-- Equip/unequip items to modify character stats
-- Shopping system *(planned)*
-
-### 🖥️ UI / UX
-- Razor Pages and MVC Views for all screens
-- Bootstrap 5 — fully responsive across desktop and mobile
-- Game dashboard with character status, active zone, and combat log
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Frontend** | Bootstrap 5, Razor Pages / MVC Views |
-| **Backend** | ASP.NET Core 8 MVC |
-| **ORM** | Entity Framework Core |
-| **Authentication** | ASP.NET Core Identity |
-| **Database (Dev)** | SQLite |
-| **Database (Prod)** | SQL Server |
-| **IDE** | Visual Studio 2022 |
-| **Version Control** | Git / GitHub |
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      IdleQuest Frontend                      │
+│              (index.html — vanilla JS / Tailwind)            │
+└────────────────────┬────────────────────┬────────────────────┘
+                     │ REST (JWT)          │ WebSocket (SignalR)
+                     ▼                    ▼
+┌────────────────────────────────────────────────────────────────┐
+│                       API Layer                                │
+│  AuthController  PlayerController  CombatController  ...      │
+│  GlobalExceptionMiddleware  RateLimitAttribute                 │
+│  Background: AutoCombatTick | WorldEventScheduler | AutoSave  │
+└─────────────────────────┬──────────────────────────────────────┘
+                          │
+┌─────────────────────────▼──────────────────────────────────────┐
+│                   Application Layer                            │
+│  PlayerService  CombatService  QuestService  SaveLoadService  │
+│  IDomainEventDispatcher  IGameHubNotifier  ICacheService       │
+└──────────────┬────────────────────────────┬────────────────────┘
+               │                            │
+┌──────────────▼──────────┐  ┌─────────────▼───────────────────┐
+│      Domain Layer       │  │     Infrastructure Layer        │
+│  Player (Aggregate)     │  │  EF Core (SQL Server)           │
+│  Item / Quest / Enemy   │  │  Redis (cache + SignalR hub)    │
+│  Zone / NPC / Combat    │  │  JWT Auth  (BCrypt passwords)   │
+│  StatBlock (VO)         │  │  DomainEventDispatcher          │
+│  DomainEvents           │  │  GameHub (SignalR)              │
+│  DomainException        │  │  Repositories (1 per aggregate) │
+└─────────────────────────┘  └─────────────────────────────────┘
+```
 
 ---
 
-## 🗃️ Database Entities
+## Key Design Decisions
 
-### `Character`
+### 1. Domain-Driven Design (DDD)
+- **Aggregates** (`Player`, `CombatSession`, etc.) are the only mutation entry points.
+- All state changes raise **domain events** — no direct cross-aggregate calls.
+- `DomainException` flows up to `GlobalExceptionMiddleware` → clean HTTP 400.
+
+### 2. Event-Driven Logic
+```
+Player.GainXP()  →  PlayerLeveledUp event
+  └─► PlayerLeveledUpHandler.HandleAsync()
+        └─► IGameHubNotifier.NotifyPlayerAsync("LevelUp", {...})
+              └─► Frontend receives real-time SignalR push
+```
+Adding new behaviors (achievements, analytics) = add a handler, zero existing code changes.
+
+### 3. Value Objects
+`StatBlock` is an **immutable record** — equipment bonuses compose with `Add()` cleanly:
 ```csharp
-public class Character
-{
-    public int Id { get; set; }
-    public string Name { get; set; }
-    public string Class { get; set; }      // Warrior, Mage, Rogue
-    public int Level { get; set; } = 1;
-    public int XP { get; set; } = 0;
-    public int HP { get; set; } = 100;
-    public int Attack { get; set; } = 10;
-    public int Defense { get; set; } = 5;
-    public string UserId { get; set; }     // FK to ApplicationUser
-    public ApplicationUser User { get; set; }
-    public ICollection<Item> Inventory { get; set; }
-    public ICollection<CombatLog> CombatLogs { get; set; }
-}
+var effective = baseStats.Add(weapon.Bonus).Add(armor.Bonus);
 ```
 
-### `Item`
-```csharp
-public class Item
-{
-    public int Id { get; set; }
-    public string Name { get; set; }
-    public string Type { get; set; }       // Weapon, Armor, Accessory
-    public string Rarity { get; set; }     // Common, Rare, Epic, Legendary
-    public int AttackBonus { get; set; }
-    public int DefenseBonus { get; set; }
-    public bool IsEquipped { get; set; }
-    public int CharacterId { get; set; }
-    public Character Character { get; set; }
-}
-```
+### 4. Multiplayer-Ready SignalR
+- Per-player groups: `player:{id}` — push level-ups, loot, quest completions.
+- Per-zone groups: `zone:{id}` — broadcast player arrivals/departures.
+- Redis backplane (`AddStackExchangeRedis`) enables horizontal scaling across pods.
 
-### `CombatLog`
-```csharp
-public class CombatLog
-{
-    public int Id { get; set; }
-    public string EnemyName { get; set; }
-    public bool PlayerWon { get; set; }
-    public int XPGained { get; set; }
-    public string ItemDropped { get; set; }
-    public DateTime Timestamp { get; set; }
-    public int CharacterId { get; set; }
-    public Character Character { get; set; }
-}
-```
+### 5. Idle Reward System
+`CombatService.ClaimIdleRewardsAsync()` computes offline XP/gold from `LastLoginAt`:
+- Capped at 8 hours of offline gains.
+- Auto-save service persists online players every 2 minutes to `SaveSlot.Auto`.
+
+### 6. Save / Load
+Full player snapshots stored as compressed JSON in `SaveGame.Snapshot`.
+- 4 slots: `Auto`, `Manual1`, `Manual2`, `Manual3`.
+- Version field enables forward-compatible migration on load.
+
+### 7. Clean Cache Strategy
+| Cache Key         | TTL    | Invalidated on         |
+|-------------------|--------|------------------------|
+| `player:{id}`     | 5 min  | Any player mutation    |
+| `leaderboard:top` | 2 min  | Rolling expiry         |
+| `zone:{id}`       | 10 min | Admin update           |
 
 ---
 
-## 🚀 Getting Started
+## API Endpoints Summary
+
+| Method | Path                          | Description                      |
+|--------|-------------------------------|----------------------------------|
+| POST   | `/api/auth/register`          | Register new account             |
+| POST   | `/api/auth/login`             | Login → JWT + refresh token      |
+| POST   | `/api/auth/refresh`           | Refresh expired JWT              |
+| GET    | `/api/player/me`              | Current player state             |
+| PATCH  | `/api/player/me/rename`       | Rename hero                      |
+| PATCH  | `/api/player/me/class`        | Change class (Warrior→Mage etc.) |
+| POST   | `/api/player/me/prestige`     | Prestige reset (requires lv 50)  |
+| GET    | `/api/player/leaderboard`     | Top players                      |
+| GET    | `/api/inventory`              | Full inventory                   |
+| POST   | `/api/inventory/equip/{id}`   | Equip item                       |
+| DELETE | `/api/inventory/equip/{slot}` | Unequip slot                     |
+| POST   | `/api/inventory/{id}/sell`    | Sell item for gold               |
+| GET    | `/api/quests/available`       | Quests player can accept         |
+| POST   | `/api/quests/{id}/accept`     | Accept a quest                   |
+| POST   | `/api/quests/{id}/complete`   | Complete & claim rewards         |
+| POST   | `/api/combat/start/{zoneId}`  | Enter combat in zone             |
+| POST   | `/api/combat/{session}/attack`| Manual attack                    |
+| POST   | `/api/combat/{session}/flee`  | Attempt to flee                  |
+| POST   | `/api/combat/idle-rewards`    | Claim offline idle gains         |
+| GET    | `/api/npcs/zone/{zoneId}`     | NPCs in current zone             |
+| POST   | `/api/npcs/{id}/dialogue`     | Start NPC dialogue               |
+| GET    | `/api/npcs/{id}/shop`         | NPC shop inventory               |
+| POST   | `/api/npcs/{id}/shop/{item}`  | Purchase item from NPC           |
+| GET    | `/api/world/zones`            | All zones + unlock status        |
+| POST   | `/api/world/zones/{id}/travel`| Travel to zone                   |
+| GET    | `/api/saves`                  | List save slots                  |
+| POST   | `/api/saves/{slot}`           | Save game                        |
+| POST   | `/api/saves/{slot}/load`      | Load game from slot              |
+
+**SignalR Hub:** `wss://{host}/hubs/game?access_token={jwt}`
+
+### Server → Client Events
+| Event           | Payload                               | Trigger                    |
+|-----------------|---------------------------------------|----------------------------|
+| `LevelUp`       | `{ newLevel, bonusHp, bonusAtk }`     | Player levels up           |
+| `CombatStarted` | `{ sessionId, enemyName, enemyHp }`   | Combat begins              |
+| `CombatUpdate`  | `CombatStateDto`                      | Each attack/flee           |
+| `CombatVictory` | `{ xpGained, goldGained, lootCount }` | Enemy defeated             |
+| `QuestCompleted`| `{ title, xpReward, goldReward }`     | Quest finished             |
+| `Prestige`      | `{ newPrestigeLevel, message }`       | Prestige completed         |
+| `WorldEvents`   | `WorldEventDto[]`                     | Active event broadcast     |
+
+---
+
+## Quick Start
 
 ### Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- [Visual Studio 2022](https://visualstudio.microsoft.com/)
-- [Git](https://git-scm.com/)
+- .NET 8 SDK
+- SQL Server (or LocalDB for dev)
+- Redis (or `docker run -p 6379:6379 redis`)
 
-### Installation
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/IdleQuest.git
-cd IdleQuest
-
-# 2. Restore NuGet packages
-dotnet restore
-
-# 3. Apply database migrations
-dotnet ef database update
-
-# 4. Run the application
-dotnet run
-```
-
-Then open your browser at `https://localhost:7xxx`.
-
-### Configuration
-
-Edit `appsettings.json` to customize game settings:
-
+### 1. Configure `appsettings.Development.json`
 ```json
 {
-  "GameSettings": {
-    "IdleXpPerMinute": 10,
-    "BaseXpToLevelUp": 100,
-    "XpScalingFactor": 1.5,
-    "MaxLevel": 50
-  }
+  "ConnectionStrings": {
+    "IdleQuest": "Server=(localdb)\\mssqllocaldb;Database=IdleQuestDev;Trusted_Connection=True;",
+    "Redis": "localhost:6379"
+  },
+  "Jwt": {
+    "SecretKey": "CHANGE-THIS-TO-A-256-BIT-SECRET-IN-PRODUCTION",
+    "Issuer": "idlequest-api",
+    "Audience": "idlequest-client"
+  },
+  "AllowedOrigins": ["http://localhost:5173", "http://127.0.0.1:5500"]
 }
 ```
 
----
-
-## 📁 Project Structure
-
-```
-IdleQuest/
-├── Controllers/
-│   ├── HomeController.cs
-│   ├── AccountController.cs
-│   ├── CharacterController.cs
-│   ├── CombatController.cs
-│   └── InventoryController.cs
-├── Models/
-│   ├── ApplicationUser.cs
-│   ├── Character.cs
-│   ├── Item.cs
-│   └── CombatLog.cs
-├── Data/
-│   └── ApplicationDbContext.cs
-├── Views/
-│   ├── Shared/
-│   │   └── _Layout.cshtml
-│   ├── Home/
-│   ├── Character/
-│   ├── Combat/
-│   └── Inventory/
-├── wwwroot/
-│   ├── css/
-│   └── js/
-├── appsettings.json
-└── Program.cs
+### 2. Apply Migrations
+```bash
+cd src/IdleQuest.Infrastructure
+dotnet ef migrations add InitialCreate --startup-project ../IdleQuest.API
+dotnet ef database update --startup-project ../IdleQuest.API
 ```
 
----
+### 3. Run
+```bash
+cd src/IdleQuest.API
+dotnet run
+# Swagger: https://localhost:7xxx/swagger
+```
 
-## 🗺️ Development Roadmap
+### 4. Connect Frontend
+In `index.html`, replace the in-memory `gameState` with API calls:
+```js
+// Example: login
+const res = await fetch('https://localhost:7xxx/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ username: 'hero42', password: 'secret' })
+});
+const { token, player } = await res.json();
 
-| Phase | Features | Status |
-|---|---|---|
-| **MVP** | Auth, character creation, idle XP, leveling | 🔄 In Progress |
-| **Phase 2** | Combat system, enemy generation, combat log | 📋 Planned |
-| **Phase 3** | Inventory, item drops, equipment system | 📋 Planned |
-| **Phase 4** | Shop, leaderboard, multiple zones | 📋 Planned |
-| **Phase 5** | SQL Server migration, deployment | 📋 Planned |
+// Example: SignalR connection
+const connection = new signalR.HubConnectionBuilder()
+  .withUrl('/hubs/game', { accessTokenFactory: () => token })
+  .withAutomaticReconnect()
+  .build();
 
----
-
-## 🎯 Learning Objectives
-
-This project was built to demonstrate:
-
-- ✅ **MVC Pattern** — Controllers, Views, Models in ASP.NET Core
-- ✅ **Entity Framework Core** — DbContext, migrations, entity relationships
-- ✅ **CRUD Operations** — Full create/read/update/delete for all game entities
-- ✅ **ASP.NET Core Identity** — Secure user registration and login
-- ✅ **Session Management** — Stateful game tracking in a stateless HTTP context
-- ✅ **Database Design** — Normalized relational schema for game data
-- ✅ **Responsive UI** — Bootstrap 5 grid, components, and theming
-
----
-
-## 📚 Resources & Tools
-
-- [ASP.NET Core Docs](https://docs.microsoft.com/en-us/aspnet/core/)
-- [Entity Framework Core Docs](https://docs.microsoft.com/en-us/ef/core/)
-- [Bootstrap 5 Docs](https://getbootstrap.com/docs/5.3/)
-- [ASP.NET Core Identity](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/identity)
+connection.on('LevelUp', ({ newLevel }) => showToast(`Level up! → ${newLevel}`, 'amber'));
+await connection.start();
+```
 
 ---
 
-## 🏫 Academic Context
+## NuGet Packages Required
 
-**Institution:** Symbiosis University of Applied Sciences, Indore  
-**Program:** Practical Skill Journal  
-**Skill No.:** 1 & 2  
-**Title:** Web-Based RPG Adventure using ASP.NET Core  
-**Skills Acquired:** C#, ASP.NET Core MVC, Entity Framework Core, State Management, Bootstrap 5
+```xml
+<!-- IdleQuest.Infrastructure.csproj -->
+<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
+<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.*" />
+<PackageReference Include="StackExchange.Redis" Version="2.*" />
+<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.*" />
+<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="8.*" />
+<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.*" />
+<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.*" />
+<PackageReference Include="BCrypt.Net-Next" Version="4.*" />
+
+<!-- IdleQuest.API.csproj -->
+<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+<PackageReference Include="AspNetCore.HealthChecks.Redis" Version="8.*" />
+```
 
 ---
 
-## 📄 License
+## Scaling Path
 
-This project is developed for academic purposes as part of the Symbiosis University Skill Journal curriculum.
-
----
-
-*Built with ⚔️ and C# — IdleQuest, Symbiosis University of Applied Sciences*
+| Scale Step | What to Add |
+|------------|-------------|
+| Multi-instance | Redis SignalR backplane (already wired) |
+| High read load | Read replicas + CQRS read models |
+| Combat throughput | Queue-based tick processing (Azure Service Bus / RabbitMQ) |
+| Analytics | Domain events → Kafka → ClickHouse |
+| Anti-cheat | Server-side validation of all stat calculations (already done) |
+| Mobile | Same REST + SignalR API — no changes needed |
